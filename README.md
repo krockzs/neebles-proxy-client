@@ -1,21 +1,10 @@
-# NEEBLES Proxy Client
+# N.E.E.B.L.E.S. Proxy Client — estructura 0.1.0
 
-Módulo nativo de NEEBLES OS.
+**Estado: arquitectura inicial; NO INSTALABLE AÚN.**
 
-Controla la activación y desactivación de un Tailscale Exit Node
-administrado mediante NEEBLES Proxy Server.
+Estructura alineada con el manifiesto schema 4 de Connect/Secrets y los diccionarios de idiomas de Boss.
+El manifiesto es preparatorio: todavía faltan el Lifecycle, las Surfaces certificadas, el runtime y la construcción CUSTOM V2.
 
-## Integración
-- NEEBLES Boss
-- NEEBLES Secrets
-- Tailscale
-- NEEBLES OS
+Esta etapa no modifica Boss, CUSTOM, Secrets, Connect, Tailscale, rutas, firewall ni servicios.
 
-## Interfaz
-- Boss: Install/Uninstall, Enable/Disable, Activate/Deactivate.
-- Launcher y Tray: Activate/Deactivate, Config.
-- Sin ventana principal Open.
-- Animación espiral de tres segundos.
-
-## Estado
-Desarrollo inicial.
+Consulta `docs/DISENO.md` para el contrato funcional acordado.

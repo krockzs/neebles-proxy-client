@@ -1,0 +1,18 @@
+{
+  "app.title": "NEEBLES Proxy Client",
+  "app.subtitle": "Remote Internet access via Tailscale",
+  "action.activate": "Activate",
+  "action.deactivate": "Deactivate",
+  "action.config": "Config",
+  "config.server_ip": "Server Tailscale IP",
+  "config.confirm_ip": "Confirm Tailscale IP",
+  "config.mismatch": "IP addresses do not match",
+  "config.save": "Save",
+  "status.active": "Proxy activated",
+  "status.inactive": "Proxy deactivated",
+  "status.connecting": "Checking server",
+  "error.not_found": "Server not found or you must change its Tailscale IP on your device.",
+  "error.wrong_tailnet": "Connect to the Stark tailnet.",
+  "error.activation_failed": "Unable to activate remote Internet access.",
+  "error.secrets_locked": "Unlock NEEBLES Secrets to read the configuration."
+}

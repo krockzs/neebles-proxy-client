@@ -1,0 +1,18 @@
+{
+  "app.title": "NEEBLES Proxy Client",
+  "app.subtitle": "Salida remota por Tailscale",
+  "action.activate": "Activar",
+  "action.deactivate": "Desactivar",
+  "action.config": "Configurar",
+  "config.server_ip": "IP Tailscale del servidor",
+  "config.confirm_ip": "Confirmar IP Tailscale",
+  "config.mismatch": "Las IP no coinciden",
+  "config.save": "Guardar",
+  "status.active": "Proxy activado",
+  "status.inactive": "Proxy desactivado",
+  "status.connecting": "Comprobando servidor",
+  "error.not_found": "Servidor no encontrado o debes cambiar la IP Tailscale en tu equipo.",
+  "error.wrong_tailnet": "Debes conectarte a la tailnet Stark.",
+  "error.activation_failed": "No se pudo activar la salida remota.",
+  "error.secrets_locked": "Desbloquea NEEBLES Secrets para leer la configuración."
+}
