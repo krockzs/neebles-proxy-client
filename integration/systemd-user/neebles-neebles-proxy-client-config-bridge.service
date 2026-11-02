@@ -1,0 +1,15 @@
+[Unit]
+Description=NEEBLES Proxy Client Secrets configuration bridge
+After=basic.target
+ConditionPathExists=/opt/neebles/modules/neebles-proxy-client/manifest.json
+
+[Service]
+Type=simple
+ExecStart=/opt/neebles/modules/neebles-proxy-client/runtime/neebles-proxy-client --serve-config
+Restart=on-failure
+RestartSec=2
+UMask=0077
+NoNewPrivileges=true
+
+[Install]
+WantedBy=default.target

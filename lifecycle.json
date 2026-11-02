@@ -1,0 +1,91 @@
+{
+  "hardcoded": {
+    "governor.install": "install",
+    "governor.update": "update",
+    "governor.uninstall": "uninstall",
+    "governor.enable": "enable",
+    "governor.disable": "disable",
+    "governor.activate": "activate",
+    "governor.deactivate": "deactivate",
+    "governor.open": "open"
+  },
+  "require": {},
+  "objects": {},
+  "transitions": {
+    "install": {
+      "operations": {
+        "ensure-client-vault": {
+          "artillery": "boss.workspace_execution",
+          "objective": "construction.step",
+          "munition": {
+            "step": "install-vault"
+          },
+          "tactics": {},
+          "intelligence": {}
+        },
+        "start-config-bridge": {
+          "artillery": "boss.user_service",
+          "objective": "install",
+          "munition": {
+            "resource": "config-bridge-daemon"
+          },
+          "tactics": {},
+          "intelligence": {}
+        }
+      }
+    },
+    "update": {
+      "operations": {}
+    },
+    "uninstall": {
+      "operations": {}
+    },
+    "enable": {
+      "operations": {}
+    },
+    "disable": {
+      "operations": {}
+    },
+    "activate": {
+      "operations": {
+        "set-exit-node": {
+          "artillery": "boss.platform_operation",
+          "objective": "execute",
+          "munition": {
+            "operation": "activate",
+            "require_privilege": "true"
+          },
+          "tactics": {},
+          "intelligence": {}
+        }
+      }
+    },
+    "deactivate": {
+      "operations": {
+        "clear-exit-node": {
+          "artillery": "boss.platform_operation",
+          "objective": "execute",
+          "munition": {
+            "operation": "deactivate",
+            "require_privilege": "true"
+          },
+          "tactics": {},
+          "intelligence": {}
+        }
+      }
+    },
+    "open": {
+      "operations": {
+        "open-config": {
+          "artillery": "boss.workspace_execution",
+          "objective": "construction.step",
+          "munition": {
+            "step": "open-config"
+          },
+          "tactics": {},
+          "intelligence": {}
+        }
+      }
+    }
+  }
+}

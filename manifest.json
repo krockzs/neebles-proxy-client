@@ -1,7 +1,7 @@
 {
   "schema": 4,
   "name": "neebles-proxy-client",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "entrypoint": "runtime/neebles-proxy-client",
   "lifecycle": "lifecycle.json",
   "surfaces": "surfaces.json",
@@ -9,9 +9,26 @@
   "settings": "settings/default.json",
   "uninstall": {
     "schema": 1,
-    "hardcoded": {},
+    "hardcoded": {
+      "config_bridge_service": "neebles-neebles-proxy-client-config-bridge.service"
+    },
     "main": "governor",
-    "extras": [],
+    "extras": [
+      {
+        "id": "config-bridge-daemon",
+        "type": "service",
+        "provider": "systemd-user",
+        "name": "$hardcoded.config_bridge_service",
+        "exec_start": "/opt/neebles/modules/neebles-proxy-client/runtime/neebles-proxy-client --serve-config",
+        "required": true,
+        "stop": {
+          "disable": true,
+          "timeout_ms": 5000
+        },
+        "verify": "inactive",
+        "remove": true
+      }
+    ],
     "cleanup": [
       {
         "id": "local-settings",

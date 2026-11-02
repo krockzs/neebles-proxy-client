@@ -1,0 +1,83 @@
+{
+  "schema": 2,
+  "items": {
+    "activate.launcher": {
+      "surface": "launcher",
+      "visible": true,
+      "data": {
+        "control": "button",
+        "action": "activate",
+        "label_key": "action.activate"
+      },
+      "require": {
+        "self": "active",
+        "modules": {}
+      }
+    },
+    "deactivate.launcher": {
+      "surface": "launcher",
+      "visible": true,
+      "data": {
+        "control": "button",
+        "action": "deactivate",
+        "label_key": "action.deactivate"
+      },
+      "require": {
+        "self": "active",
+        "modules": {}
+      }
+    },
+    "activate.tray": {
+      "surface": "tray",
+      "visible": true,
+      "data": {
+        "control": "button",
+        "action": "activate",
+        "label_key": "action.activate"
+      },
+      "require": {
+        "self": "active",
+        "modules": {}
+      }
+    },
+    "deactivate.tray": {
+      "surface": "tray",
+      "visible": true,
+      "data": {
+        "control": "button",
+        "action": "deactivate",
+        "label_key": "action.deactivate"
+      },
+      "require": {
+        "self": "active",
+        "modules": {}
+      }
+    },
+    "config.launcher": {
+      "surface": "launcher",
+      "visible": true,
+      "data": {
+        "control": "button",
+        "action": "open",
+        "label_key": "action.config"
+      },
+      "require": {
+        "self": "active",
+        "modules": {}
+      }
+    },
+    "config.tray": {
+      "surface": "tray",
+      "visible": true,
+      "data": {
+        "control": "button",
+        "action": "open",
+        "label_key": "action.config"
+      },
+      "require": {
+        "self": "active",
+        "modules": {}
+      }
+    }
+  }
+}
