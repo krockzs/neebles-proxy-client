@@ -1,6 +1,7 @@
 #include "config_secrets.h"
 #include "config_bridge.h"
 #include <QApplication>
+#include <QStyleFactory>
 #include <QDir>
 #include <QImage>
 #include <QCoreApplication>
@@ -23,78 +24,173 @@
 #include <QTextStream>
 #include <cmath>
 
-class Spiral : public QWidget {
+// NEEBLES visual identity, shared by Config and the transition splash.
+static QString neeblesTheme() {
+    return QStringLiteral(R"QSS(
+        QWidget {
+            background-color: #10131d;
+            color: #e7edf8;
+            font-family: "Noto Sans", sans-serif;
+            font-size: 12px;
+        }
+        QDialog {
+            background-color: #10131d;
+            border: 1px solid #313a55;
+        }
+        QLabel {
+            background: transparent;
+            color: #e7edf8;
+        }
+        QLineEdit {
+            background-color: #131827;
+            color: #edf5ff;
+            selection-background-color: #7355c6;
+            border: 1px solid #45516c;
+            border-radius: 7px;
+            padding: 8px 10px;
+            min-height: 24px;
+        }
+        QLineEdit:focus {
+            border: 1px solid #4fc9de;
+        }
+        QPushButton {
+            background-color: #252c42;
+            color: #eaf4ff;
+            border: 1px solid #465377;
+            border-radius: 7px;
+            padding: 9px 16px;
+            min-height: 22px;
+        }
+        QPushButton:hover {
+            background-color: #30415c;
+            border-color: #50d4e8;
+        }
+        QPushButton:pressed {
+            background-color: #453a76;
+        }
+        QPushButton:disabled {
+            background-color: #202630;
+            color: #777f92;
+            border-color: #3f4551;
+        }
+        QPushButton#saveButton {
+            background-color: #102b3b;
+            border: 1px solid #22d3ee;
+            color: #67e8f9;
+            font-weight: 600;
+        }
+        QPushButton#saveButton:hover {
+            background-color: #16445b;
+        }
+        QLabel#title {
+            color: #67e8f9;
+            font-size: 18px;
+            font-weight: 700;
+        }
+        QLabel#subtitle {
+            color: #a78bfa;
+            font-size: 12px;
+        }
+        QLabel#feedback {
+            background-color: #191d2c;
+            color: #cbd5e1;
+            border: 1px solid #313a55;
+            border-radius: 7px;
+            padding: 10px;
+        }
+        QToolTip {
+            background-color: #191d2c;
+            color: #e7edf8;
+            border: 1px solid #4fc9de;
+        }
+    )QSS");
+}
+
+// The splash is presentation only. It is launched by the authenticated user
+// bridge after it observes a confirmed change in the selected Exit Node.
+class Spiral final : public QWidget {
 public:
-    explicit Spiral(bool activate): on(activate) {
-        setWindowFlags(Qt::FramelessWindowHint|Qt::Dialog);
+    explicit Spiral(bool activate) : on(activate) {
+        setWindowFlags(Qt::FramelessWindowHint | Qt::Dialog | Qt::WindowStaysOnTopHint);
         setAttribute(Qt::WA_TranslucentBackground);
-        resize(520,450);
-        // Resolve artwork from the installed module, never from an arbitrary
-        // working directory alone. The canonical icon is sufficient for both
-        // animation states; a grayscale counterpart is derived in memory.
+        setFixedSize(650, 475);
+
         const QStringList candidates = {
-            qEnvironmentVariable("NEEBLES_ASSET_DIR"),
             QDir(QCoreApplication::applicationDirPath()).filePath("../assets"),
-            QDir::current().filePath("assets")
+            qEnvironmentVariable("NEEBLES_ASSET_DIR")
         };
         for (const QString &directory : candidates) {
             if (directory.isEmpty()) continue;
             const QDir assets(directory);
-            QPixmap candidate(assets.filePath("neebles-client-icon.png"));
-            if (candidate.isNull()) continue;
-            color = candidate;
-            QImage desaturated = candidate.toImage().convertToFormat(QImage::Format_ARGB32);
-            for (int y = 0; y < desaturated.height(); ++y) {
-                auto *pixels = reinterpret_cast<QRgb *>(desaturated.scanLine(y));
-                for (int x = 0; x < desaturated.width(); ++x) {
-                    const QRgb original = pixels[x];
-                    const int luminance = qGray(original);
-                    pixels[x] = qRgba(luminance, luminance, luminance, qAlpha(original));
-                }
-            }
-            gray = QPixmap::fromImage(desaturated);
+            const QPixmap originalOff(assets.filePath("neebles-client-logo-off.png"));
+            const QPixmap originalOn(assets.filePath("neebles-client-logo-on.png"));
+            if (originalOff.isNull() || originalOn.isNull()) continue;
+            off = originalOff;
+            active = originalOn;
             break;
         }
-        clock.start();
-        auto *timer=new QTimer(this);
-        connect(timer,&QTimer::timeout,this,[this,timer] {
-            progress=qMin(1.0,clock.elapsed()/3000.0);
+
+        if (off.isNull() || active.isNull()) {
+            QTextStream(stderr) << "PROXY_CLIENT_SPLASH_ASSETS_UNAVAILABLE\n";
+        }
+
+        auto *timer = new QTimer(this);
+        connect(timer, &QTimer::timeout, this, [this, timer] {
+            progress = qMin(1.0, clock.elapsed() / 3000.0);
             update();
-            if (progress>=1.0) {timer->stop();close();}
+            if (progress >= 1.0) {
+                timer->stop();
+                close();
+            }
         });
+        clock.start();
         timer->start(16);
     }
+
 protected:
     void paintEvent(QPaintEvent *) override {
-        QPainter p(this); p.setRenderHint(QPainter::SmoothPixmapTransform);
-        const QRect target(40,15,width()-80,height()-90);
-        const QPixmap &bottom=on?gray:color;
-        const QPixmap &top=on?color:gray;
-        if(!bottom.isNull()) p.drawPixmap(target,bottom);
-        if(!top.isNull()) {
-            QPainterPath mask;
-            const QPointF center=target.center();
-            const qreal maxR=std::hypot(width(),height());
-            mask.moveTo(center);
-            const int steps=600;
-            for(int i=0;i<=steps;++i){
-                const qreal t=(static_cast<qreal>(i)/steps)*progress;
-                const qreal angle=-M_PI/2+6*M_PI*t;
-                const qreal r=maxR*t;
-                mask.lineTo(center+QPointF(std::cos(angle)*r,std::sin(angle)*r));
-            }
-            // Reveal a rotating sweep sector as a preview of the proposed spiral effect.
-            QPainterPath wedge; wedge.moveTo(center);
-            const qreal angle=-M_PI/2+2*M_PI*progress;
-            wedge.arcTo(QRectF(center.x()-maxR,center.y()-maxR,2*maxR,2*maxR),90,-360*progress);
-            wedge.closeSubpath();
-            p.save();p.setClipPath(wedge);p.drawPixmap(target,top);p.restore();
+        QPainter painter(this);
+        painter.setRenderHint(QPainter::Antialiasing);
+        painter.setRenderHint(QPainter::SmoothPixmapTransform);
+
+        const QRect panel = rect().adjusted(8, 8, -8, -8);
+        painter.setBrush(QColor("#10131d"));
+        painter.setPen(QPen(QColor(on ? "#22d3ee" : "#a78bfa"), 2));
+        painter.drawRoundedRect(panel, 18, 18);
+
+        const QRect artwork = panel.adjusted(34, 24, -34, -79);
+        const QPixmap &initial = on ? off : active;
+        const QPixmap &final = on ? active : off;
+
+        if (!initial.isNull()) painter.drawPixmap(artwork, initial);
+        if (!final.isNull() && progress > 0.0) {
+            const QPointF center = artwork.center();
+            const qreal radius = std::hypot(qreal(artwork.width()), qreal(artwork.height()));
+            QPainterPath reveal;
+            reveal.moveTo(center);
+            reveal.arcTo(QRectF(center.x() - radius, center.y() - radius,
+                                2 * radius, 2 * radius),
+                         90, -360 * progress);
+            reveal.closeSubpath();
+            painter.save();
+            painter.setClipPath(reveal);
+            painter.drawPixmap(artwork, final);
+            painter.restore();
         }
-        p.setPen(Qt::white);
-        p.drawText(QRect(0,height()-65,width(),40),Qt::AlignCenter,on?"PROXY ACTIVE":"PROXY INACTIVE");
+
+        painter.setPen(QColor("#67e8f9"));
+        const QString status = on ? QStringLiteral("PROXY ACTIVE")
+                                  : QStringLiteral("PROXY INACTIVE");
+        painter.drawText(panel.adjusted(22, panel.height() - 63, -22, -24),
+                         Qt::AlignCenter, status);
     }
+
 private:
-    bool on; double progress=0; QElapsedTimer clock; QPixmap color,gray;
+    bool on;
+    double progress = 0.0;
+    QElapsedTimer clock;
+    QPixmap off;
+    QPixmap active;
 };
 
 // Install-time vault creation is headless and uses the same canonical ELF
@@ -128,6 +224,8 @@ int main(int argc, char **argv) {
     }
 
     QApplication app(argc, argv);
+    QApplication::setStyle(QStyleFactory::create(QStringLiteral("Fusion")));
+    app.setStyleSheet(neeblesTheme());
     QCommandLineParser parser;
     parser.setApplicationDescription("NEEBLES Proxy Client - configuration and status UI");
     parser.addHelpOption();
@@ -155,8 +253,16 @@ int main(int argc, char **argv) {
 
     QDialog dialog;
     dialog.setWindowTitle(QStringLiteral("NEEBLES Proxy Client - Config"));
-    dialog.setMinimumWidth(440);
+    dialog.setMinimumWidth(540);
     auto *layout = new QVBoxLayout(&dialog);
+    layout->setContentsMargins(24, 24, 24, 24);
+    layout->setSpacing(14);
+    auto *title = new QLabel(QStringLiteral("NEEBLES PROXY CLIENT"), &dialog);
+    title->setObjectName(QStringLiteral("title"));
+    layout->addWidget(title);
+    auto *subtitle = new QLabel(QStringLiteral("Tailscale · Configuración del servidor"), &dialog);
+    subtitle->setObjectName(QStringLiteral("subtitle"));
+    layout->addWidget(subtitle);
     auto *form = new QFormLayout();
     auto *ip = new QLineEdit(&dialog);
     auto *confirm = new QLineEdit(&dialog);
@@ -166,10 +272,12 @@ int main(int argc, char **argv) {
     form->addRow(QStringLiteral("Confirm IPv4:"), confirm);
     layout->addLayout(form);
     auto *message = new QLabel(&dialog);
+    message->setObjectName(QStringLiteral("feedback"));
     message->setWordWrap(true);
     layout->addWidget(message);
     auto *actions = new QHBoxLayout();
     auto *save = new QPushButton(QStringLiteral("Save in Secrets"), &dialog);
+    save->setObjectName(QStringLiteral("saveButton"));
     auto *cancel = new QPushButton(QStringLiteral("Close"), &dialog);
     actions->addWidget(save);
     actions->addWidget(cancel);
