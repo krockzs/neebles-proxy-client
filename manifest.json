@@ -42,5 +42,6 @@
       "resource_still_running": "abort",
       "cleanup_error": "abort"
     }
-  }
+  },
+  "platform_operations": "contracts/platform-operations.json"
 }
