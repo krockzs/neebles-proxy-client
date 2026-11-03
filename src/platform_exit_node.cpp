@@ -1,7 +1,8 @@
 // Operaciones de Exit Node mediante el proveedor OS controlado por Boss.
 // La IP elegida procede exclusivamente del puente de configuracion del
 // ejecutable canonico Client, que consulta su boveda Secrets en cada solicitud.
-// El proveedor root fija los argumentos --user-uid y --tailnet por politica.
+// El proveedor root fija la tailnet; el UID procede de la identidad OS
+// gestionada por Boss en /etc/neebles/runtime.env.
 #include <QCoreApplication>
 #include <QCommandLineParser>
 #include <QElapsedTimer>
@@ -13,6 +14,9 @@
 #include <QProcess>
 #include <QTextStream>
 #include <algorithm>
+#include <fcntl.h>
+#include <optional>
+#include <QByteArray>
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -57,6 +61,77 @@ bool trustedCanonical(const pid_t pid) {
     const QByteArray procExe = QStringLiteral("/proc/%1/exe").arg(pid).toLocal8Bit();
     if (::stat(procExe.constData(), &observed) != 0) return false;
     return installed.st_dev == observed.st_dev && installed.st_ino == observed.st_ino;
+}
+
+// The desktop identity is taken only from the root-owned Boss installation
+// authority, never from caller-supplied IPC, CLI arguments or the environment.
+// Path components are opened with O_NOFOLLOW to prevent symlink substitution.
+std::optional<uid_t> desktopUidFromOs() {
+    int directory = ::open("/", O_RDONLY | O_DIRECTORY | O_CLOEXEC);
+    if (directory < 0) return std::nullopt;
+    for (const char *component : {"etc", "neebles"}) {
+        const int next = ::openat(directory, component,
+                                  O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
+        ::close(directory);
+        if (next < 0) return std::nullopt;
+        directory = next;
+        struct stat meta{};
+        if (::fstat(directory, &meta) != 0 || !S_ISDIR(meta.st_mode) ||
+            meta.st_uid != 0 || (meta.st_mode & 0022) != 0) {
+            ::close(directory);
+            return std::nullopt;
+        }
+    }
+
+    const int descriptor = ::openat(directory, "runtime.env",
+                                    O_RDONLY | O_NOFOLLOW | O_CLOEXEC | O_NONBLOCK);
+    ::close(directory);
+    if (descriptor < 0) return std::nullopt;
+    struct stat info{};
+    if (::fstat(descriptor, &info) != 0 || !S_ISREG(info.st_mode) ||
+        info.st_uid != 0 || (info.st_mode & 0022) != 0 ||
+        info.st_nlink != 1 || info.st_size <= 0 || info.st_size > 4096) {
+        ::close(descriptor);
+        return std::nullopt;
+    }
+
+    QByteArray contents;
+    char buffer[4096];
+    while (contents.size() < 4096) {
+        const ssize_t size = ::read(descriptor, buffer, sizeof(buffer));
+        if (size < 0) {
+            ::close(descriptor);
+            return std::nullopt;
+        }
+        if (size == 0) break;
+        contents.append(buffer, qsizetype(size));
+    }
+    ::close(descriptor);
+    if (contents.size() != info.st_size || contents.contains('\0')) return std::nullopt;
+
+    bool haveUid = false;
+    bool haveGid = false;
+    uid_t uid = 0;
+    for (const QByteArray &line : contents.split('\n')) {
+        if (line.startsWith("NEEBLES_DESKTOP_UID=")) {
+            if (haveUid) return std::nullopt;
+            bool parsed = false;
+            const uint number = line.mid(sizeof("NEEBLES_DESKTOP_UID=") - 1)
+                                    .toUInt(&parsed);
+            if (!parsed || number == 0 || number > 60000) return std::nullopt;
+            uid = uid_t(number);
+            haveUid = true;
+        } else if (line.startsWith("NEEBLES_DESKTOP_GID=")) {
+            if (haveGid) return std::nullopt;
+            bool parsed = false;
+            const uint number = line.mid(sizeof("NEEBLES_DESKTOP_GID=") - 1)
+                                    .toUInt(&parsed);
+            if (!parsed || number == 0 || number > 60000) return std::nullopt;
+            haveGid = true;
+        }
+    }
+    if (!haveUid || !haveGid) return std::nullopt;
+    return uid;
 }
 
 bool configuredServer(uid_t uid, QString &serverIp) {
@@ -171,7 +246,6 @@ int main(int argc, char **argv) {
     cli.addOption({"activate", "Select Secrets-configured Exit Node"});
     cli.addOption({"deactivate", "Clear the currently selected Exit Node"});
     cli.addOption({"inspect", "Inspect matching Exit Node"});
-    cli.addOption({"user-uid", "Root-policy-supplied desktop uid", "uid"});
     cli.addOption({"tailnet", "Root-policy-supplied expected tailnet", "name"});
     cli.process(app);
     auto deny = [](const char *reason, int code) {
@@ -180,13 +254,12 @@ int main(int argc, char **argv) {
     };
     const int count = int(cli.isSet("activate")) + int(cli.isSet("deactivate")) +
                       int(cli.isSet("inspect"));
-    if (count != 1 || !cli.isSet("user-uid") || !cli.isSet("tailnet"))
+    if (count != 1 || !cli.isSet("tailnet"))
         return deny("invalid OS policy arguments", 2);
     if (::geteuid() != 0) return deny("root OS provider required", 3);
-    bool parsedUid = false;
-    const uint user = cli.value("user-uid").toUInt(&parsedUid);
+    const std::optional<uid_t> user = desktopUidFromOs();
     const QString tailnet = cli.value("tailnet").trimmed();
-    if (!parsedUid || user == 0 || user > 60000 || tailnet.isEmpty() ||
+    if (!user.has_value() || tailnet.isEmpty() ||
         tailnet.size() > 255 || tailnet.contains('\n'))
         return deny("invalid OS policy identity", 4);
 
@@ -214,7 +287,7 @@ int main(int argc, char **argv) {
     }
 
     QString ip;
-    if (!configuredServer(uid_t(user), ip))
+    if (!configuredServer(*user, ip))
         return deny("canonical Secrets configuration bridge unavailable", 5);
     const bool active = selected(before, ip);
     if (anyExitNodeSelected(before) && !active)
