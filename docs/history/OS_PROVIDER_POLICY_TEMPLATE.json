@@ -1,0 +1,14 @@
+{
+  "schema": "1",
+  "module": "neebles-proxy-client",
+  "operations": {
+    "activate": {
+      "executable": "/usr/lib/neebles/module-operations/neebles-proxy-client-platform",
+      "argv": ["--activate", "--user-uid=__DESKTOP_UID__", "--tailnet=__TAILNET__"]
+    },
+    "deactivate": {
+      "executable": "/usr/lib/neebles/module-operations/neebles-proxy-client-platform",
+      "argv": ["--deactivate", "--user-uid=__DESKTOP_UID__", "--tailnet=__TAILNET__"]
+    }
+  }
+}

@@ -97,7 +97,34 @@ int serve(int argc, char **argv) {
     QFile::setPermissions(path, QFileDevice::ReadOwner | QFileDevice::WriteOwner);
 
     QString knownServerIp; // RAM only; updated on privileged bridge requests.
-    QObject::connect(&server, &QLocalServer::newConnection, &app, [&server, &knownServerIp]() {
+    bool initialized = false;
+    bool ownActive = false;
+    // A confirmed OS-provider notification avoids missing rapid changes between
+    // one-second polls. Polling remains a read-only fallback and reconciler.
+    auto present = [&app, &initialized, &ownActive](bool state, bool confirmed) {
+        if (!initialized) {
+            initialized = true;
+            ownActive = state;
+            if (!confirmed) return; // Do not animate the pre-existing login state.
+        } else {
+            if (ownActive == state) return;
+            ownActive = state;
+        }
+        if (qEnvironmentVariableIsEmpty("DISPLAY") &&
+            qEnvironmentVariableIsEmpty("WAYLAND_DISPLAY")) {
+            QTextStream(stderr) << "PROXY_CLIENT_ANIMATION_NO_DESKTOP_SESSION\n";
+            return;
+        }
+        const QString action = state ? QStringLiteral("--show-active")
+                                     : QStringLiteral("--show-inactive");
+        const QString installed = QCoreApplication::applicationFilePath();
+        if (!QProcess::startDetached(installed, {action},
+                                     QCoreApplication::applicationDirPath())) {
+            QTextStream(stderr) << "PROXY_CLIENT_ANIMATION_LAUNCH_FAILED\n";
+        }
+    };
+    QObject::connect(&server, &QLocalServer::newConnection, &app,
+                     [&server, &knownServerIp, &present, &app]() {
         while (server.hasPendingConnections()) {
             QLocalSocket *peer = server.nextPendingConnection();
             struct ucred cred{};
@@ -110,7 +137,8 @@ int serve(int argc, char **argv) {
                 peer->deleteLater();
                 continue;
             }
-            QObject::connect(peer, &QLocalSocket::readyRead, peer, [peer, &knownServerIp]() {
+            QObject::connect(peer, &QLocalSocket::readyRead, peer,
+                             [peer, &knownServerIp, &present, &app]() {
                 if (peer->bytesAvailable() > 256) {
                     peer->disconnectFromServer();
                     return;
@@ -133,6 +161,18 @@ int serve(int argc, char **argv) {
                     } else {
                         response.insert("error", "configuration_unavailable");
                     }
+                } else if (parse.error == QJsonParseError::NoError && request.isObject() &&
+                           request.object().size() == 3 &&
+                           request.object().value("schema").toString() == QStringLiteral("1") &&
+                           request.object().value("op").toString() == QStringLiteral("state.confirmed") &&
+                           request.object().value("active").isBool()) {
+                    response.insert("ok", true);
+                    const bool active = request.object().value("active").toBool();
+                    // This channel has already verified SO_PEERCRED uid=0. The
+                    // privileged helper sends only AFTER Tailscale post-check.
+                    QTimer::singleShot(0, &app, [&present, active]() {
+                        present(active, true);
+                    });
                 } else {
                     response.insert("error", "invalid_request");
                 }
@@ -150,12 +190,10 @@ int serve(int argc, char **argv) {
     auto *monitor = new QProcess(&app);
     auto *tick = new QTimer(&app);
     tick->setInterval(1000);
-    bool initialized = false;
-    bool ownActive = false;
     QObject::connect(monitor,
                      QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
                      &app,
-                     [monitor, &initialized, &ownActive, &knownServerIp]
+                     [monitor, &knownServerIp, &present]
                      (int exitCode, QProcess::ExitStatus status) {
         if (status != QProcess::NormalExit || exitCode != 0) return;
         const QJsonDocument document = QJsonDocument::fromJson(monitor->readAllStandardOutput());
@@ -179,20 +217,7 @@ int serve(int argc, char **argv) {
             }
             if (!currentActive) return; // A foreign node is not Proxy Client.
         }
-        if (!initialized) {
-            initialized = true;
-            ownActive = currentActive;
-            return; // Do not animate a pre-existing state at login.
-        }
-        if (ownActive == currentActive) return;
-        ownActive = currentActive;
-        const QString action = currentActive ? QStringLiteral("--show-active")
-                                             : QStringLiteral("--show-inactive");
-        const QString installed = QCoreApplication::applicationFilePath();
-        if (!QProcess::startDetached(installed, {action},
-                                     QCoreApplication::applicationDirPath())) {
-            QTextStream(stderr) << "PROXY_CLIENT_ANIMATION_LAUNCH_FAILED\n";
-        }
+        present(currentActive, false);
     });
     QObject::connect(tick, &QTimer::timeout, &app, [monitor]() {
         if (monitor->state() != QProcess::NotRunning) return;

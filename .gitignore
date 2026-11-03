@@ -1,0 +1,4 @@
+# Los artefactos generados deben compilarse fuera del repositorio.
+/build-proxy-client-100-candidate/
+**/__pycache__/
+*.py[cod]

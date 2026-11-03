@@ -1,7 +1,7 @@
 {
   "schema": 4,
   "name": "neebles-proxy-client",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "entrypoint": "runtime/neebles-proxy-client",
   "lifecycle": "lifecycle.json",
   "surfaces": "surfaces.json",
@@ -42,5 +42,7 @@
       "resource_still_running": "abort",
       "cleanup_error": "abort"
     }
-  }
+  },
+  "platform_operations": "contracts/platform-operations.json",
+  "other-label-open": true
 }

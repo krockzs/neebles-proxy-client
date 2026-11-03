@@ -14,5 +14,6 @@
   "error.not_found": "Server not found or you must change its Tailscale IP on your device.",
   "error.wrong_tailnet": "Connect to the Stark tailnet.",
   "error.activation_failed": "Unable to activate remote Internet access.",
-  "error.secrets_locked": "Unlock NEEBLES Secrets to read the configuration."
+  "error.secrets_locked": "Unlock NEEBLES Secrets to read the configuration.",
+  "action.proxy": "Proxy"
 }

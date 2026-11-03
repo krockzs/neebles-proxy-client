@@ -1,0 +1,18 @@
+{
+  "schema": "1",
+  "module": "neebles-proxy-client",
+  "operations": {
+    "activate": {
+      "executable": "/opt/neebles/modules/neebles-proxy-client/runtime/neebles-proxy-client-platform",
+      "argv": [
+        "--activate"
+      ]
+    },
+    "deactivate": {
+      "executable": "/opt/neebles/modules/neebles-proxy-client/runtime/neebles-proxy-client-platform",
+      "argv": [
+        "--deactivate"
+      ]
+    }
+  }
+}

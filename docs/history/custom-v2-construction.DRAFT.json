@@ -1,0 +1,158 @@
+{
+  "schema": "1",
+  "name": "neebles-domestic-construction",
+  "subject": "neebles-proxy-client",
+  "rootfs": {
+    "rust-qt": {
+      "domination": {
+        "world": "modules.rust-qt"
+      }
+    }
+  },
+  "steps": [
+    {
+      "id": "init",
+      "runtime_authority": "boss.runtime",
+      "world": "boss.git",
+      "writable": [
+        {
+          "authority": "neebles.domestic_workspace",
+          "source": "/opt/neebles-build/modules",
+          "destination": "/work/modules"
+        }
+      ],
+      "mounts": {
+        "proc": true,
+        "dev": true,
+        "tmp": true
+      },
+      "chdir": "/work/modules",
+      "arguments": [
+        "init",
+        "/work/modules/neebles-proxy-client"
+      ],
+      "session": false,
+      "execution": "foreground"
+    },
+    {
+      "id": "fetch",
+      "runtime_authority": "boss.runtime",
+      "world": "boss.git",
+      "readonly": [
+        "system.dns_resolver_config"
+      ],
+      "writable": [
+        {
+          "authority": "neebles.domestic_workspace",
+          "source": "/opt/neebles-build/modules",
+          "destination": "/work/modules"
+        }
+      ],
+      "mounts": {
+        "proc": true,
+        "dev": true,
+        "tmp": true
+      },
+      "chdir": "/work/modules",
+      "arguments": [
+        "-C",
+        "/work/modules/neebles-proxy-client",
+        "fetch",
+        "--depth",
+        "1",
+        "https://github.com/krockzs/neebles-proxy-client.git",
+        "__PIN_CLIENT_COMMIT_SHA40__"
+      ],
+      "session": false,
+      "execution": "foreground"
+    },
+    {
+      "id": "checkout",
+      "runtime_authority": "boss.runtime",
+      "world": "boss.git",
+      "writable": [
+        {
+          "authority": "neebles.domestic_workspace",
+          "source": "/opt/neebles-build/modules",
+          "destination": "/work/modules"
+        }
+      ],
+      "mounts": {
+        "proc": true,
+        "dev": true,
+        "tmp": true
+      },
+      "chdir": "/work/modules",
+      "arguments": [
+        "-C",
+        "/work/modules/neebles-proxy-client",
+        "checkout",
+        "--detach",
+        "__PIN_CLIENT_COMMIT_SHA40__"
+      ],
+      "session": false,
+      "execution": "foreground"
+    },
+    {
+      "id": "open-config",
+      "runtime_authority": "modules.runtime",
+      "rootfs": "rust-qt",
+      "world": "modules.rust-qt",
+      "execution": "persistent",
+      "session": true,
+      "readonly": [
+        "boss.modules.ipc"
+      ],
+      "dynamic_readonly": [
+        {
+          "authority": "modules.installed_runtime",
+          "source": "/opt/neebles/modules/neebles-proxy-client",
+          "destination": "/opt/neebles/modules/neebles-proxy-client"
+        }
+      ],
+      "mounts": {
+        "proc": true,
+        "dev": true,
+        "tmp": true
+      },
+      "chdir": "/opt/neebles/modules/neebles-proxy-client",
+      "arguments": [
+        "/opt/neebles/modules/neebles-proxy-client/runtime/neebles-proxy-client",
+        "--config"
+      ],
+      "session_readonly": [
+        "neebles-secrets/secrets.sock"
+      ]
+    },
+    {
+      "id": "install-vault",
+      "runtime_authority": "modules.runtime",
+      "rootfs": "rust-qt",
+      "world": "modules.rust-qt",
+      "execution": "foreground",
+      "session": true,
+      "readonly": [],
+      "dynamic_readonly": [
+        {
+          "authority": "modules.installed_runtime",
+          "source": "/opt/neebles/modules/neebles-proxy-client",
+          "destination": "/opt/neebles/modules/neebles-proxy-client"
+        }
+      ],
+      "mounts": {
+        "proc": true,
+        "dev": true,
+        "tmp": true
+      },
+      "chdir": "/opt/neebles/modules/neebles-proxy-client",
+      "arguments": [
+        "/opt/neebles/modules/neebles-proxy-client/runtime/neebles-proxy-client",
+        "--intent",
+        "install-vault"
+      ],
+      "session_readonly": [
+        "neebles-secrets/secrets.sock"
+      ]
+    }
+  ]
+}
