@@ -10,7 +10,45 @@
     "governor.open": "open"
   },
   "require": {},
-  "objects": {},
+  "objects": {
+    "proxy-exit-node": {
+      "initial_active": false,
+      "transition_active": {
+        "activate": true,
+        "deactivate": false
+      },
+      "transitions": {
+        "activate": {
+          "operations": {
+            "set-exit-node": {
+              "artillery": "boss.platform_operation",
+              "objective": "execute",
+              "munition": {
+                "operation": "activate",
+                "require_privilege": "true"
+              },
+              "tactics": {},
+              "intelligence": {}
+            }
+          }
+        },
+        "deactivate": {
+          "operations": {
+            "clear-exit-node": {
+              "artillery": "boss.platform_operation",
+              "objective": "execute",
+              "munition": {
+                "operation": "deactivate",
+                "require_privilege": "true"
+              },
+              "tactics": {},
+              "intelligence": {}
+            }
+          }
+        }
+      }
+    }
+  },
   "transitions": {
     "install": {
       "operations": {
