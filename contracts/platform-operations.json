@@ -1,0 +1,20 @@
+{
+  "schema": "1",
+  "module": "neebles-proxy-client",
+  "operations": {
+    "activate": {
+      "executable": "/usr/lib/neebles/module-operations/neebles-proxy-client-platform",
+      "argv": [
+        "--activate",
+        "--tailnet=olate.pablo@gmail.com"
+      ]
+    },
+    "deactivate": {
+      "executable": "/usr/lib/neebles/module-operations/neebles-proxy-client-platform",
+      "argv": [
+        "--deactivate",
+        "--tailnet=olate.pablo@gmail.com"
+      ]
+    }
+  }
+}
