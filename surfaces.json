@@ -1,58 +1,6 @@
 {
   "schema": 2,
   "items": {
-    "activate.launcher": {
-      "surface": "launcher",
-      "visible": true,
-      "data": {
-        "control": "button",
-        "action": "activate",
-        "label_key": "action.activate"
-      },
-      "require": {
-        "self": "active",
-        "modules": {}
-      }
-    },
-    "deactivate.launcher": {
-      "surface": "launcher",
-      "visible": true,
-      "data": {
-        "control": "button",
-        "action": "deactivate",
-        "label_key": "action.deactivate"
-      },
-      "require": {
-        "self": "active",
-        "modules": {}
-      }
-    },
-    "activate.tray": {
-      "surface": "tray",
-      "visible": true,
-      "data": {
-        "control": "button",
-        "action": "activate",
-        "label_key": "action.activate"
-      },
-      "require": {
-        "self": "active",
-        "modules": {}
-      }
-    },
-    "deactivate.tray": {
-      "surface": "tray",
-      "visible": true,
-      "data": {
-        "control": "button",
-        "action": "deactivate",
-        "label_key": "action.deactivate"
-      },
-      "require": {
-        "self": "active",
-        "modules": {}
-      }
-    },
     "config.launcher": {
       "surface": "launcher",
       "visible": true,
@@ -73,6 +21,40 @@
         "control": "button",
         "action": "open",
         "label_key": "action.config"
+      },
+      "require": {
+        "self": "active",
+        "modules": {}
+      }
+    },
+    "proxy-exit-node.launcher": {
+      "surface": "launcher",
+      "object_id": "proxy-exit-node",
+      "visible": true,
+      "data": {
+        "control": "switch",
+        "action_on": "activate",
+        "action_off": "deactivate",
+        "transition_on": "activate",
+        "transition_off": "deactivate",
+        "label_key": "action.proxy"
+      },
+      "require": {
+        "self": "active",
+        "modules": {}
+      }
+    },
+    "proxy-exit-node.tray": {
+      "surface": "tray",
+      "object_id": "proxy-exit-node",
+      "visible": true,
+      "data": {
+        "control": "switch",
+        "action_on": "activate",
+        "action_off": "deactivate",
+        "transition_on": "activate",
+        "transition_off": "deactivate",
+        "label_key": "action.proxy"
       },
       "require": {
         "self": "active",
