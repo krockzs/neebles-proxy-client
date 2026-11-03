@@ -14,5 +14,6 @@
   "error.not_found": "Servidor no encontrado o debes cambiar la IP Tailscale en tu equipo.",
   "error.wrong_tailnet": "Debes conectarte a la tailnet Stark.",
   "error.activation_failed": "No se pudo activar la salida remota.",
-  "error.secrets_locked": "Desbloquea NEEBLES Secrets para leer la configuración."
+  "error.secrets_locked": "Desbloquea NEEBLES Secrets para leer la configuración.",
+  "action.proxy": "Proxy"
 }
