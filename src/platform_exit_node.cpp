@@ -161,45 +161,60 @@ void notifyConfirmedState(uid_t uid, bool active) {
 }
 
 bool configuredServer(uid_t uid, QString &serverIp) {
+    // F07: observabilidad sin IP, credenciales ni contenido de Secrets.
+    // No cambia los plazos ni las comprobaciones de seguridad.
+    QElapsedTimer bridgeClock;
+    bridgeClock.start();
+    const auto fail = [&](const char *phase) -> bool {
+        QTextStream(stderr) << "PROXY_CLIENT_BRIDGE_DIAG phase=" << phase
+                            << " elapsed_ms=" << bridgeClock.elapsed()
+                            << " budget_elapsed_ms=" << clockBudget.elapsed()
+                            << '\n';
+        return false;
+    };
     const QString path = QStringLiteral("/run/user/%1/neebles/proxy-client/bridge.sock").arg(qulonglong(uid));
     struct stat info{};
     if (::lstat(path.toLocal8Bit().constData(), &info) != 0 ||
         !S_ISSOCK(info.st_mode) || info.st_uid != uid ||
-        (info.st_mode & 0077) != 0) return false;
+        (info.st_mode & 0077) != 0) return fail("socket_metadata");
     QLocalSocket socket;
     socket.connectToServer(path);
     const int connectMs = remaining(900);
-    if (!connectMs || !socket.waitForConnected(connectMs)) return false;
+    if (!connectMs || !socket.waitForConnected(connectMs)) return fail("connect");
     struct ucred cred{};
     socklen_t size = sizeof(cred);
     if (::getsockopt(int(socket.socketDescriptor()), SOL_SOCKET,
                      SO_PEERCRED, &cred, &size) != 0 ||
         size != sizeof(cred) || cred.uid != uid ||
-        !trustedCanonical(cred.pid)) return false;
+        !trustedCanonical(cred.pid)) return fail("peer_identity");
     const QByteArray request =
         "{\"schema\":\"1\",\"op\":\"server-ip.get\"}\n";
-    if (socket.write(request) != request.size()) return false;
+    if (socket.write(request) != request.size()) return fail("write");
     const int flushMs = remaining(900);
-    if (!flushMs || !socket.waitForBytesWritten(flushMs)) return false;
+    if (!flushMs || !socket.waitForBytesWritten(flushMs)) return fail("flush");
     QByteArray answer;
     while (!answer.contains('\n')) {
         if (socket.bytesAvailable()) {
             answer += socket.readAll();
-            if (answer.size() > kMaxReplyBytes) return false;
+            if (answer.size() > kMaxReplyBytes) return fail("response_size");
             continue;
         }
-        const int ms = remaining(1000);
-        if (!ms || !socket.waitForReadyRead(ms)) return false;
+        // F15: cubrir el plazo máximo IPC de Secrets sin extender el presupuesto global.
+        const int ms = remaining(5000);
+        if (!ms || !socket.waitForReadyRead(ms)) return fail("response_wait");
     }
-    if (answer.indexOf('\n') != answer.size() - 1) return false;
+    if (answer.indexOf('\n') != answer.size() - 1) return fail("response_framing");
     QJsonParseError err{};
     const QJsonDocument reply = QJsonDocument::fromJson(answer.trimmed(), &err);
-    if (err.error != QJsonParseError::NoError || !reply.isObject()) return false;
+    if (err.error != QJsonParseError::NoError || !reply.isObject()) return fail("response_json");
     const QJsonObject value = reply.object();
     if (value.size() != 3 || value.value("schema").toString() != "1" ||
         value.value("ok").toBool() != true ||
-        !validIp(value.value("server_ipv4").toString())) return false;
+        !validIp(value.value("server_ipv4").toString())) return fail("response_validation");
     serverIp = value.value("server_ipv4").toString();
+    QTextStream(stderr) << "PROXY_CLIENT_BRIDGE_DIAG phase=success elapsed_ms="
+                        << bridgeClock.elapsed() << " budget_elapsed_ms="
+                        << clockBudget.elapsed() << '\n';
     return true;
 }
 

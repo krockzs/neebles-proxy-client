@@ -1,4 +1,4 @@
-# N.E.E.B.L.E.S. Proxy Client 1.0.1 — candidato fuente F19
+# N.E.E.B.L.E.S. Proxy Client 1.0.2 — candidato de fuente
 
 ## Entrega del código
 
@@ -72,3 +72,24 @@ Secretos fuera del contrato existente. `NEEBLES_MODULES_SOCKET` permite
 solo redirigir el endpoint en pruebas controladas. La aceptación real
 requiere instalar mediante Boss, confirmar registro SO_PEERCRED y comprobar
 el ciclo Governor Open/Close con RuntimeLease y Secrets.
+
+
+## F19 — Candidato local de corrección IPC 1.0.2 (NO PUBLICADO)
+
+- Causa aún pendiente de aceptación instalada: fallo intermitente `rc=5`
+  del helper al consultar el Bridge de Secrets.
+- Fuente `src/platform_exit_node.cpp`: espera de `server-ip.get` ampliada
+  de 1000 a 5000 ms, conservando el presupuesto total de 8500 ms.
+- Se conserva la instrumentación sanitizada de fases de F07/F15; no
+  registrar IP de Secrets ni valores privados en logs.
+- F14B y F17 probaron la semántica Qt con Bridge SIMULADO; no
+  constituyen prueba de reparación de la instalación real.
+- F16 compiló un ELF de diagnóstico en Esbirro (Qt 6.8.2/GCC 14),
+  SHA-256 `a45a765841df593130c9a6734f787759ace05f4a755c2d9191992e9b6ad9e0a3`.
+  No es ELF de release ni está autorizado para instalarse como root.
+- F18: PASS de seguridad ESTÁTICA (8 tests); falta suite dinámica
+  de Bridge con fallos inducidos, build final de los tres ELF,
+  DESTDIR/Esbirro/CUSTOM V2, nueva aprobación OS y aceptación ON/OFF.
+- No conceder privilegios por defecto; la aprobación vigente del
+  helper 1.0.1 no autoriza nuevos bytes. No hacer sudo desde la UI.
+- No tocar Secrets 1.0.7, Proxy Server ni Boss 2.0.16 sin evidencia.
