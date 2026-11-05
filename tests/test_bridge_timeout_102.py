@@ -7,7 +7,7 @@ import unittest
 ROOT=pathlib.Path(__file__).resolve().parents[1]
 class BridgeTimeoutSourceContract(unittest.TestCase):
     def test_candidate_version(self):
-        self.assertEqual(json.loads((ROOT/'manifest.json').read_text())['version'],'1.0.2')
+        self.assertGreaterEqual(tuple(map(int, json.loads((ROOT/'manifest.json').read_text())['version'].split('.'))), (1,0,2))
     def test_bridge_wait_is_bounded(self):
         source=(ROOT/'src/platform_exit_node.cpp').read_text()
         self.assertIn('kTotalBudgetMs = 8500',source)

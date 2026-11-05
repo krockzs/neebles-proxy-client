@@ -10,6 +10,8 @@
 #include <QJsonObject>
 #include <QJsonArray>
 #include <QProcess>
+#include <QProcessEnvironment>
+#include <QRegularExpression>
 #include <QStringList>
 #include <QLocalServer>
 #include <QLocalSocket>
@@ -22,6 +24,82 @@
 #include <unistd.h>
 
 namespace ProxyConfigBridge {
+
+// Presentation-only recovery. The long-lived Bridge may start before KDE
+// imports DISPLAY/XAUTHORITY into the systemd --user manager. Query the
+// current authenticated user manager at presentation time; do not touch
+// privileged routing, global environment, vault data or the service state.
+static bool recoverGraphicalEnvironment(QProcessEnvironment &environment) {
+    QProcess manager;
+    manager.start(QStringLiteral("/usr/bin/systemctl"),
+                  {QStringLiteral("--user"), QStringLiteral("show-environment")});
+    if (!manager.waitForStarted(400) || !manager.waitForFinished(1200) ||
+        manager.exitStatus() != QProcess::NormalExit || manager.exitCode() != 0) {
+        if (manager.state() != QProcess::NotRunning) {
+            manager.kill();
+            manager.waitForFinished(150);
+        }
+        return false;
+    }
+    const QByteArray bytes = manager.readAllStandardOutput();
+    if (bytes.size() > 65536) return false;
+    QString display;
+    QString xauthority;
+    QString wayland;
+    for (const QString &line : QString::fromUtf8(bytes).split(QLatin1Char('\n'))) {
+        if (line.startsWith(QStringLiteral("DISPLAY=")))
+            display = line.mid(sizeof("DISPLAY=") - 1);
+        else if (line.startsWith(QStringLiteral("XAUTHORITY=")))
+            xauthority = line.mid(sizeof("XAUTHORITY=") - 1);
+        else if (line.startsWith(QStringLiteral("WAYLAND_DISPLAY=")))
+            wayland = line.mid(sizeof("WAYLAND_DISPLAY=") - 1);
+    }
+    // Local desktop presentation only. Never trust remote X11 display strings.
+    const bool x11 = QRegularExpression(
+        QStringLiteral(R"(^:[0-9]{1,3}(\.[0-9]{1,2})?$)")).match(display).hasMatch();
+    if (x11) {
+        QFileInfo auth(xauthority);
+        if (!auth.isAbsolute() || !auth.isFile() || auth.isSymLink() ||
+            auth.ownerId() != ::geteuid() ||
+            (auth.permissions() & (QFileDevice::WriteGroup | QFileDevice::WriteOther)))
+            return false;
+        environment.insert(QStringLiteral("DISPLAY"), display);
+        environment.insert(QStringLiteral("XAUTHORITY"), xauthority);
+        environment.remove(QStringLiteral("WAYLAND_DISPLAY"));
+        return true;
+    }
+    if (QRegularExpression(QStringLiteral(R"(^wayland-[0-9]{1,3}$)"))
+            .match(wayland).hasMatch()) {
+        environment.insert(QStringLiteral("WAYLAND_DISPLAY"), wayland);
+        environment.remove(QStringLiteral("DISPLAY"));
+        environment.remove(QStringLiteral("XAUTHORITY"));
+        return true;
+    }
+    return false;
+}
+
+// Secrets error strings are untrusted; only explicitly allowed fixed codes
+// may appear in the journal. No vault values, server IPs or raw IPC replies.
+static QString safeSecretsFailureCode(const QString &error) {
+    static const QStringList permitted = {
+        QStringLiteral("module_identity_mismatch"),
+        QStringLiteral("invalid_runtime_directory"),
+        QStringLiteral("invalid_ipc_request"),
+        QStringLiteral("secrets_unavailable"),
+        QStringLiteral("secrets_ipc_write_failed"),
+        QStringLiteral("secrets_ipc_write_timeout"),
+        QStringLiteral("secrets_ipc_read_timeout"),
+        QStringLiteral("secrets_invalid_response_size"),
+        QStringLiteral("secrets_invalid_response"),
+        QStringLiteral("secrets_operation_denied"),
+        QStringLiteral("secrets_response_missing_data"),
+        QStringLiteral("config_identity_mismatch"),
+        QStringLiteral("invalid_stored_server_ip"),
+        QStringLiteral("entity_not_found")
+    };
+    return permitted.contains(error) ? error : QStringLiteral("other");
+}
+
 
 int serve(int argc, char **argv) {
     QCoreApplication app(argc, argv);
@@ -110,16 +188,30 @@ int serve(int argc, char **argv) {
             if (ownActive == state) return;
             ownActive = state;
         }
-        if (qEnvironmentVariableIsEmpty("DISPLAY") &&
-            qEnvironmentVariableIsEmpty("WAYLAND_DISPLAY")) {
-            QTextStream(stderr) << "PROXY_CLIENT_ANIMATION_NO_DESKTOP_SESSION\n";
-            return;
-        }
         const QString action = state ? QStringLiteral("--show-active")
                                      : QStringLiteral("--show-inactive");
         const QString installed = QCoreApplication::applicationFilePath();
-        if (!QProcess::startDetached(installed, {action},
-                                     QCoreApplication::applicationDirPath())) {
+        bool launched = false;
+        // The current process may be older than the desktop-session import.
+        // Preserve the existing direct launch path whenever it is complete.
+        if (!qEnvironmentVariableIsEmpty("DISPLAY") &&
+            !qEnvironmentVariableIsEmpty("XAUTHORITY")) {
+            launched = QProcess::startDetached(installed, {action},
+                                                QCoreApplication::applicationDirPath());
+        } else {
+            QProcessEnvironment desktop = QProcessEnvironment::systemEnvironment();
+            if (!recoverGraphicalEnvironment(desktop)) {
+                QTextStream(stderr) << "PROXY_CLIENT_ANIMATION_NO_DESKTOP_SESSION\n";
+                return;
+            }
+            QProcess presentation;
+            presentation.setProgram(installed);
+            presentation.setArguments({action});
+            presentation.setWorkingDirectory(QCoreApplication::applicationDirPath());
+            presentation.setProcessEnvironment(desktop);
+            launched = presentation.startDetached();
+        }
+        if (!launched) {
             QTextStream(stderr) << "PROXY_CLIENT_ANIMATION_LAUNCH_FAILED\n";
         }
     };
@@ -159,6 +251,8 @@ int serve(int argc, char **argv) {
                         response.insert("server_ipv4", ip);
                         knownServerIp = ip;
                     } else {
+                        QTextStream(stderr) << "PROXY_CLIENT_SECRETS_DIAG phase=read_server_ip status="
+                                            << safeSecretsFailureCode(error) << '\n';
                         response.insert("error", "configuration_unavailable");
                     }
                 } else if (parse.error == QJsonParseError::NoError && request.isObject() &&

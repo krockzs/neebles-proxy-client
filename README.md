@@ -1,4 +1,4 @@
-# N.E.E.B.L.E.S. Proxy Client 1.0.2 — candidato de fuente
+# N.E.E.B.L.E.S. Proxy Client 1.0.3 — corrección candidata (NO PUBLICADA)
 
 ## Entrega del código
 
@@ -93,3 +93,19 @@ el ciclo Governor Open/Close con RuntimeLease y Secrets.
 - No conceder privilegios por defecto; la aprobación vigente del
   helper 1.0.1 no autoriza nuevos bytes. No hacer sudo desde la UI.
 - No tocar Secrets 1.0.7, Proxy Server ni Boss 2.0.16 sin evidencia.
+
+## F38 — candidata correctiva 1.0.3 (sin certificación ni publicación)
+
+- Identidad de proyecto CMake y manifiesto unificadas en `1.0.3`.
+- El Bridge obtiene únicamente `DISPLAY` y `XAUTHORITY` (o `WAYLAND_DISPLAY`)
+  del administrador `systemd --user` cuando el proceso empezó antes de KDE;
+  no hardcodea sesión ni exige reiniciar el servicio para presentar el splash.
+- `server-ip.get` registra solamente el código de fallo permitido, sin valores
+  de Secrets. El proveedor privilegiado continúa siendo el único responsable
+  del Exit Node; la interfaz no obtiene nuevos privilegios.
+- Boss ya gestiona quiescencia, reinstalación y reconciliación de servicios de
+  usuario en Update; Uninstall procesa `manifest.uninstall.extras`. No se
+  duplican operaciones en `lifecycle.update` / `lifecycle.uninstall`.
+- El material 1.0.2 y los ELF F36B anteriores son históricos; estos cambios
+  requieren nueva compilación Esbirro, cierre ELF, certificación de material,
+  pins de CUSTOM V2 y Registry, autoridad OS y aceptación en Vivo.
