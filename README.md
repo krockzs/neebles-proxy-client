@@ -1,111 +1,235 @@
-# N.E.E.B.L.E.S. Proxy Client 1.0.3 — corrección candidata (NO PUBLICADA)
+# N.E.E.B.L.E.S. Proxy Client
 
-## Entrega del código
+Módulo cliente de NEEBLES Proxy para seleccionar y controlar
+un Exit Node de Tailscale mediante la infraestructura
+gobernada de NEEBLES OS.
 
-Módulo de usuario para configurar un nodo de salida Tailscale en su propia bóveda NEEBLES Secrets.
-La pantalla `--config` solicita la IP del servidor dos veces. El Bridge de usuario
-`--serve-config` atiende solicitudes autenticadas del proveedor OS por un socket privado
-sin persistir la IP fuera de Secrets.
+La versión declarada se encuentra en `manifest.json`.
+La versión publicada debe confirmarse mediante el Registry
+y la release correspondiente.
 
-Las acciones Activate/Deactivate son acciones de **Boss Lifecycle**;
-no se ejecuta `sudo`, setuid ni modificación directa de rutas desde la interfaz.
-El ejecutable privilegiado `runtime/neebles-proxy-client-platform` está destinado
-exclusivamente al proveedor OS independiente, mediante política root fija.
-La animación de tres segundos se activa al observar un cambio confirmado del
-Exit Node propio en Tailscale desde el Bridge de usuario. Requiere una sesión
-gráfica disponible en el servicio de usuario y aceptación real en VivoProBook.
+## 1. Arquitectura
 
-## Autoridades y límites
+Proxy Client utiliza:
 
-- `manifest.json`, `lifecycle.json`, `surfaces.json` y `settings/default.json`: contratos del módulo.
-- `integration/systemd-user/`: unidad declarada para `boss.user_service`.
-- `src/config_secrets.cpp`: única autoridad persistente para la IP, mediante Secrets.
-- `runtime/`: ELF Qt 6.8.2 compilados y auditados en Esbirro (no Qt del host).
-- `assets/`: icono canónico utilizado en la animación.
-- `tooling/custom-v2-candidate/`: borradores **no productivos**, no son autoridad CUSTOM V2.
+- Tailscale: conexión de red y Exit Node.
+- NEEBLES Secrets: almacenamiento de configuración sensible.
+- NEEBLES Boss: instalación y operaciones Lifecycle.
+- Proveedor privilegiado del sistema: operaciones autorizadas
+  sobre Tailscale.
+- Bridge de usuario: integración con la configuración.
 
-**Publicar Client no instala el módulo.** Falta completar el material propio y
-Construction en CUSTOM V2, fijar los commits de Client y CUSTOM en Boss Registry,
-materializar el proveedor root con política fija en VivoProBook y aceptar
-la integración Secrets/Bridge/ON/OFF/4G. El Preflight HTTP incluido exige IP y tailnet como parámetros y es una
-herramienta de comprobación no privilegiada; el Lifecycle de Activate valida
-la aprobación y conectividad Tailscale en el proveedor, no ejecuta ese Preflight.
+La interfaz gráfica no ejecuta `sudo` ni modifica
+directamente las rutas del sistema.
 
-## F19 — cierre de fuente, pendiente de certificación y aceptación instalada
+La preparación inicial de Tailscale es responsabilidad del
+usuario y debe efectuarse antes de instalar Proxy Client.
 
-- F18 mantiene un solo `toggle-button` declarado en Launcher y Tray. El QML genérico
-  de Boss que lo consume debe certificarse por separado; **no se cambia su estado por
-  inferir éxito de una pulsación**. La sincronización con el Exit Node real y los
-  reinicios de Boss siguen siendo gates de aceptación instalada.
-- El proveedor OS comunica al Bridge `state.confirmed` solo después de confirmar
-  el resultado de Tailscale. El Bridge acepta esa señal exclusivamente desde UID 0,
-  muestra el splash de tres segundos y conserva el sondeo de estado como respaldo.
-  Una notificación visual fallida nunca modifica rutas ni revierte la operación.
-- `--config` usa la paleta negra, violeta y cian del Launcher/Tray de Boss y almacena
-  la dirección únicamente por Secrets, con doble confirmación.
-- Todos los cambios de esta fase son **fuente**. No se recompilaron ni certificaron
-  aquí los ELF de runtime; no se actualizó CUSTOM V2, Registry, Boss ni el proveedor OS.
+## 2. Requisitos previos
 
-### Gates faltantes antes de release
+- Equipo Linux compatible con Tailscale.
+- Conectividad a Internet.
+- Acceso a la tailnet correspondiente.
+- Un Proxy Server configurado como Exit Node.
+- Exit Node autorizado desde la administración de Tailscale.
+- NEEBLES OS, Boss y Secrets compatibles con el módulo.
 
-1. Compilar en el Esbirro Qt 6.8.2/GCC14 controlado, ejecutar CTest y auditar ELF
-   desde el DESTDIR y el material CUSTOM V2 autenticado.
-2. Verificar el contrato QML de F18 en Boss compilado, con resultado real de Lifecycle
-   (éxito/fallo) y reconciliación de estado al reiniciar.
-3. Instalar con autoridad del OS y validar Secrets, Bridge, Session DISPLAY/XAUTHORITY,
-   Tailscale, splash ON/OFF, Config, cierres y errores inducidos.
-4. Seleccionar SHA, versionar material/Construction y publicar únicamente tras gates.
+La IP que debe utilizar el cliente es la dirección
+Tailscale del servidor, no su IP pública de Internet.
 
+## 3. Instalar Tailscale
 
-## F30 — Registro de Config en Module IPC
+Comprobar si ya está instalado:
 
-La ventana `--config` actúa como el runtime gobernado por `governor.open`:
-se conecta a `/run/neebles/modules.sock` mediante tramas JSON de longitud
-declarada, anuncia `register` con protocolo 1 y sin endpoints de Commands,
-y conserva esa conexión durante la vida de la ventana. Responde `ping`
-y `shutdown`; al cerrar envía `unregister`. Si Boss rechaza o pierde
-la sesión, Config falla de forma cerrada. `--serve-config` continúa siendo
-un servicio independiente y no ocupa RuntimeRegistry.
+```bash
+command -v tailscale
+```
 
-El transporte no concede privilegios, no altera el Exit Node ni gestiona
-Secretos fuera del contrato existente. `NEEBLES_MODULES_SOCKET` permite
-solo redirigir el endpoint en pruebas controladas. La aceptación real
-requiere instalar mediante Boss, confirmar registro SO_PEERCRED y comprobar
-el ciclo Governor Open/Close con RuntimeLease y Secrets.
+Si no está instalado, utilizar la instalación oficial:
 
+```bash
+curl -fsSL https://tailscale.com/install.sh | sh
+```
 
-## F19 — Candidato local de corrección IPC 1.0.2 (NO PUBLICADO)
+O utilizar los paquetes oficiales de Debian:
 
-- Causa aún pendiente de aceptación instalada: fallo intermitente `rc=5`
-  del helper al consultar el Bridge de Secrets.
-- Fuente `src/platform_exit_node.cpp`: espera de `server-ip.get` ampliada
-  de 1000 a 5000 ms, conservando el presupuesto total de 8500 ms.
-- Se conserva la instrumentación sanitizada de fases de F07/F15; no
-  registrar IP de Secrets ni valores privados en logs.
-- F14B y F17 probaron la semántica Qt con Bridge SIMULADO; no
-  constituyen prueba de reparación de la instalación real.
-- F16 compiló un ELF de diagnóstico en Esbirro (Qt 6.8.2/GCC 14),
-  SHA-256 `a45a765841df593130c9a6734f787759ace05f4a755c2d9191992e9b6ad9e0a3`.
-  No es ELF de release ni está autorizado para instalarse como root.
-- F18: PASS de seguridad ESTÁTICA (8 tests); falta suite dinámica
-  de Bridge con fallos inducidos, build final de los tres ELF,
-  DESTDIR/Esbirro/CUSTOM V2, nueva aprobación OS y aceptación ON/OFF.
-- No conceder privilegios por defecto; la aprobación vigente del
-  helper 1.0.1 no autoriza nuevos bytes. No hacer sudo desde la UI.
-- No tocar Secrets 1.0.7, Proxy Server ni Boss 2.0.16 sin evidencia.
+https://pkgs.tailscale.com/stable/
 
-## F38 — candidata correctiva 1.0.3 (sin certificación ni publicación)
+Habilitar el servicio:
 
-- Identidad de proyecto CMake y manifiesto unificadas en `1.0.3`.
-- El Bridge obtiene únicamente `DISPLAY` y `XAUTHORITY` (o `WAYLAND_DISPLAY`)
-  del administrador `systemd --user` cuando el proceso empezó antes de KDE;
-  no hardcodea sesión ni exige reiniciar el servicio para presentar el splash.
-- `server-ip.get` registra solamente el código de fallo permitido, sin valores
-  de Secrets. El proveedor privilegiado continúa siendo el único responsable
-  del Exit Node; la interfaz no obtiene nuevos privilegios.
-- Boss ya gestiona quiescencia, reinstalación y reconciliación de servicios de
-  usuario en Update; Uninstall procesa `manifest.uninstall.extras`. No se
-  duplican operaciones en `lifecycle.update` / `lifecycle.uninstall`.
-- El material 1.0.2 y los ELF F36B anteriores son históricos; estos cambios
-  requieren nueva compilación Esbirro, cierre ELF, certificación de material,
-  pins de CUSTOM V2 y Registry, autoridad OS y aceptación en Vivo.
+```bash
+sudo systemctl enable --now tailscaled
+```
+
+Si el equipo todavía no está autenticado:
+
+```bash
+sudo tailscale up
+```
+
+Completar la autenticación en la tailnet donde se encuentra
+Proxy Server.
+
+Verificar:
+
+```bash
+tailscale version
+tailscale status
+tailscale ip -4
+```
+
+## 4. Identificar el Exit Node
+
+Desde el cliente:
+
+```bash
+tailscale status
+```
+
+Identificar el servidor autorizado como Exit Node.
+
+También es posible consultar su dirección IP desde el
+servidor utilizando:
+
+```bash
+tailscale ip -4
+```
+
+No utilizar direcciones de ejemplo como configuración real.
+
+## 5. Probar manualmente el Exit Node
+
+Antes de instalar Proxy Client es recomendable verificar
+que el túnel y el Exit Node funcionan.
+
+Definir la IP Tailscale real del servidor:
+
+```bash
+EXIT_NODE_IP="100.x.y.z"
+```
+
+Reemplazar `100.x.y.z` por la dirección correcta.
+
+Seleccionar temporalmente el Exit Node:
+
+```bash
+sudo tailscale set --exit-node="$EXIT_NODE_IP"
+```
+
+Comprobar:
+
+```bash
+tailscale status
+```
+
+Opcionalmente, consultar la IP pública de salida:
+
+```bash
+curl -4 https://api.ipify.org
+echo
+```
+
+La IP pública observada debería corresponder a la salida
+a Internet del servidor, considerando la red del servidor.
+
+Si el cliente necesita conservar acceso directo a su
+red local, evaluar expresamente:
+
+```bash
+sudo tailscale set \
+    --exit-node-allow-lan-access=true
+```
+
+Esto modifica el comportamiento de acceso a la LAN y no
+debe habilitarse sin considerar sus implicaciones.
+
+## 6. Devolver el control al módulo
+
+Terminada la comprobación manual, desactivar la selección
+temporal del Exit Node:
+
+```bash
+sudo tailscale set --exit-node=
+```
+
+Este comando no desconecta el equipo de la tailnet;
+solamente elimina la selección del Exit Node.
+
+Verificar:
+
+```bash
+tailscale status
+```
+
+El cliente queda conectado a Tailscale y preparado para que
+NEEBLES Proxy Client administre posteriormente la selección
+del Exit Node mediante sus operaciones autorizadas.
+
+No es necesario ejecutar manualmente el comando de
+selección durante el uso cotidiano del módulo.
+
+## 7. Instalación de NEEBLES Proxy Client
+
+Con Tailscale instalado y el Exit Node previamente probado:
+
+1. Abrir NEEBLES Boss.
+2. Instalar Proxy Client mediante Boss.
+3. Abrir Config del módulo.
+4. Introducir la IP Tailscale correspondiente al servidor.
+5. Confirmar la dirección solicitada por Config.
+6. Guardar mediante la integración con NEEBLES Secrets.
+7. Comprobar que la configuración se recupera correctamente.
+
+La dirección del servidor se administra mediante Secrets,
+no mediante un archivo de texto con credenciales.
+
+No almacenar claves privadas en el repositorio.
+
+## 8. Funcionamiento
+
+La activación y desactivación de Proxy Client son
+operaciones gobernadas por Boss Lifecycle.
+
+El proveedor privilegiado debe confirmar el estado real
+de Tailscale.
+
+La interfaz no debe inferir que la operación tuvo éxito
+únicamente porque el usuario pulsó un botón.
+
+El splash visual de activación o desactivación depende
+del estado confirmado del Exit Node y de una sesión
+gráfica disponible.
+
+## 9. Comprobaciones
+
+Después de instalar:
+
+1. Abrir Config y verificar la recuperación desde Secrets.
+2. Activar Proxy Client.
+3. Confirmar el Exit Node real mediante `tailscale status`.
+4. Verificar la salida a Internet.
+5. Desactivar Proxy Client.
+6. Confirmar que la selección del Exit Node desaparece.
+7. Verificar la recuperación después de reiniciar el equipo.
+
+Las pruebas deben realizarse sobre la instalación real,
+no únicamente sobre simulaciones de Bridge o Lifecycle.
+
+## 10. Referencias técnicas
+
+- `manifest.json`: identidad y versión declarada.
+- `lifecycle.json`: operaciones gobernadas.
+- `surfaces.json`: interfaz declarada.
+- `src/config_secrets.cpp`: integración de configuración.
+- `runtime/`: ejecutables del módulo.
+- `integration/systemd-user/`: servicio de usuario.
+- `contracts/platform-operations.json`: operaciones
+  declaradas hacia el proveedor del sistema.
+
+La autoridad privilegiada permanece en el sistema
+operativo, no en la interfaz del módulo.
+
+Documentación oficial:
+
+- https://tailscale.com/docs/install/linux
+- https://tailscale.com/docs/features/exit-nodes
